@@ -6,7 +6,6 @@ import { concatMap, finalize, from, toArray } from 'rxjs';
 import { ApiService, Customer, errMsg } from '../core/api';
 import { ConfirmService } from '../core/confirm';
 import { SHOP, SHOP_PIN, addBaseLayers } from '../core/map';
-import { randomCustomer } from '../core/sample';
 
 declare const L: any; // โหลดจาก CDN ใน index.html
 
@@ -26,6 +25,7 @@ const BLANK: Form = { firstname: '', lastname: '', phone: '', address: '', lat: 
       <section class="card">
         <h2 class="text-[17px] font-bold mb-3">{{ editingId ? 'แก้ไขลูกค้า #' + editingId : 'เพิ่มลูกค้าใหม่' }}
           <span class="text-sm text-mute">{{ nearby ? '(ในรัศมี ' + nearby.radius + ' กม. พบ ' + list.length + ' คน)' : '(' + list.length + ' คน)' }}</span></h2>
+
         <div class="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-2 mb-2.5">
           <input class="field w-full" [(ngModel)]="f.firstname" placeholder="ชื่อ">
           <input class="field w-full" [(ngModel)]="f.lastname" placeholder="นามสกุล">
@@ -34,12 +34,13 @@ const BLANK: Form = { firstname: '', lastname: '', phone: '', address: '', lat: 
           <input class="field w-full" [(ngModel)]="f.lat" type="number" step="any" placeholder="ละติจูด (lat)">
           <input class="field w-full" [(ngModel)]="f.lng" type="number" step="any" placeholder="ลองจิจูด (lng)">
         </div>
+
         <div class="flex flex-wrap items-center gap-2 mb-3">
-          <button class="btn" (click)="save()">{{ editingId ? 'บันทึกการแก้ไข' : 'เพิ่มลูกค้า' }}</button>
-          <button class="btn-sec" (click)="sample()">🎲 สุ่มตัวอย่างลงฟอร์ม</button>
+          <button class="btn-pri" (click)="save()">{{ editingId ? 'บันทึกการแก้ไข' : 'เพิ่มลูกค้า' }}</button>
           <button class="btn-sec" (click)="reset()">ล้างฟอร์ม</button>
-          <input class="field" [(ngModel)]="search" (ngModelChange)="load()" placeholder="ค้นหาชื่อลูกค้า…">
+          <input class="field flex-1 min-w-[200px]" [(ngModel)]="search" (keyup.enter)="load()" placeholder="ค้นหาชื่อลูกค้า...">
         </div>
+
         <div class="flex flex-wrap items-center gap-2 mb-3">
           <button class="btn-sec" (click)="nearbySearch()">📍 หาลูกค้าใกล้พิกัดที่เลือก</button>
           <input class="field w-[90px]" type="number" min="0.1" step="0.1" [(ngModel)]="radius"><span>กม.</span>
@@ -48,17 +49,16 @@ const BLANK: Form = { firstname: '', lastname: '', phone: '', address: '', lat: 
           }
           <span class="text-sm text-mute">ใช้พิกัดจากช่องละติจูด/ลองจิจูด (คลิกบนแผนที่) ถ้าเว้นว่างใช้ตำแหน่งร้าน</span>
         </div>
-        <div class="flex flex-wrap items-center gap-2 mb-3">
-          <span class="text-sm text-mute">ข้อมูลทดสอบ:</span>
-          <label class="text-sm text-mute">จำนวน <input class="field w-[70px]" type="number" min="1" max="50" [(ngModel)]="randCount"> คน</label>
-          <button class="btn-sec" (click)="addRandom()" [disabled]="busy">🎲 สุ่มเพิ่มลูกค้า</button>
-          <button class="btn-sec" (click)="deleteAll()" [disabled]="busy">🗑️ ลบลูกค้าทั้งหมด</button>
-        </div>
+
         <p class="text-sm text-mute my-3.5">💡 คลิกบนแผนที่เพื่อกำหนดพิกัดบ้านลูกค้า</p>
         <div #cmap class="h-[380px] rounded-[10px] mt-3"></div>
       </section>
 
       <section class="card">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <span class="text-sm text-mute">รายชื่อลูกค้า</span>
+          <button class="btn-sec" (click)="deleteAll()" [disabled]="busy">🗑️ ลบลูกค้าทั้งหมด</button>
+        </div>
         <div class="max-h-[360px] overflow-auto">
           <table class="w-full text-sm">
             <thead><tr><th>#</th><th>ชื่อ</th><th>เบอร์โทร</th><th>ที่อยู่</th><th>พิกัด</th><th></th></tr></thead>
@@ -97,7 +97,6 @@ export class CustomersComponent implements OnInit, AfterViewInit, OnDestroy {
   search = '';
   editingId: number | null = null;
   f: Form = { ...BLANK };
-  randCount = 10;
   busy = false;
   radius: number | null = 1;
   nearby: { lat: number; lng: number; radius: number } | null = null;
@@ -229,27 +228,6 @@ export class CustomersComponent implements OnInit, AfterViewInit, OnDestroy {
     this.f = { firstname: c.firstname, lastname: c.lastname, phone: c.phone, address: c.address, lat: String(c.lat), lng: String(c.lng) };
     this.showPick(c.lat, c.lng);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  // สุ่มลูกค้าตัวอย่างลงฟอร์ม ตรวจ/แก้ได้ก่อนกด "เพิ่มลูกค้า"
-  sample() {
-    const c = randomCustomer(SHOP);
-    this.editingId = null;
-    this.f = { ...c, lat: String(c.lat), lng: String(c.lng) };
-    this.showPick(c.lat, c.lng);
-    this.map.setView([c.lat, c.lng], 15);
-  }
-
-  // เพิ่มลูกค้าสุ่มทีละคนตามจำนวนที่กรอก (1–50)
-  addRandom() {
-    const n = Math.min(Math.max(Math.round(Number(this.randCount)) || 10, 1), 50);
-    this.busy = true;
-    from(Array.from({ length: n }, () => randomCustomer(SHOP)))
-      .pipe(concatMap((c) => this.api.send('/customer', 'POST', c)), toArray(), finalize(() => (this.busy = false)))
-      .subscribe({
-        next: (r) => { this.api.say(`เพิ่มลูกค้าสุ่มแล้ว ${r.length} คน`); this.load(); },
-        error: (e) => { this.api.say(errMsg(e)); this.load(); },
-      });
   }
 
   // ลบลูกค้าทุกคนพร้อมออเดอร์ของแต่ละคน (backend ไม่มี API ลบทีเดียว จึงลบทีละคนด้วย ?force=true)
